@@ -76,19 +76,22 @@ export function DashboardSidebar({ role: serverRole }: { role?: string } = {}) {
     const role = rawRole.trim().toLowerCase() as UserRole
 
     const menuItems = menuItemByRole[role] || menuItemByRole.seeker
-    console.log("Session:", session)
-    console.log("User Role:", session?.user?.role)
-    console.log("Final Role:", role)
+    // console.log("Session:", session)
+    // console.log("User Role:", session?.user?.role)
+    // console.log("Final Role:", role)
 
     return (
-        <Sidebar>
+        <Sidebar className="bg-[#131314] border-[#2a2a2b] [--sidebar:#131314] [--sidebar-foreground:#f4f4f5] [--sidebar-accent:#1e1e21] [--sidebar-accent-foreground:#ffffff] [--sidebar-border:#2a2a2b] [--sidebar-ring:#5c53fe]">
             <SidebarHeader />
             <SidebarContent>
                 <SidebarGroup>
                     <SidebarMenu>
                         {menuItems.map((item) => (
                             <SidebarMenuItem key={item.id}>
-                                <SidebarMenuButton render={<Link href={item.url} />}>
+                                <SidebarMenuButton
+                                    className="text-[#a0a0ab] hover:bg-[#1e1e21] hover:text-white data-active:bg-[#1e1e21] data-active:text-white"
+                                    render={<Link href={item.url} />}
+                                >
                                     <item.icon />
                                     <span>{item.name}</span>
                                 </SidebarMenuButton>

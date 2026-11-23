@@ -156,6 +156,7 @@ function Sidebar({
   className,
   children,
   dir,
+  style,
   ...props
 }: React.ComponentProps<"div"> & {
   side?: "left" | "right"
@@ -187,10 +188,11 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          className={cn("w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden", className)}
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+              ...style,
             } as React.CSSProperties
           }
           side={side}
@@ -207,7 +209,7 @@ function Sidebar({
 
   return (
     <div
-      className="group peer hidden text-sidebar-foreground md:block"
+      className="group peer hidden text-sidebar-foreground  md:block"
       data-state={state}
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
@@ -260,11 +262,12 @@ function SidebarTrigger({
 
   return (
     <Button
+
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon-sm"
-      className={cn(className)}
+      className={cn(className, 'text-white mt-5')}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
@@ -566,7 +569,7 @@ function SidebarMenuAction({
         className: cn(
           "absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform group-data-[collapsible=icon]:hidden peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 after:absolute after:-inset-2 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 md:after:hidden [&>svg]:size-4 [&>svg]:shrink-0",
           showOnHover &&
-            "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 peer-data-active/menu-button:text-sidebar-accent-foreground aria-expanded:opacity-100 md:opacity-0",
+          "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 peer-data-active/menu-button:text-sidebar-accent-foreground aria-expanded:opacity-100 md:opacity-0",
           className
         ),
       },

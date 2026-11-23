@@ -1,7 +1,7 @@
 
 import { headers } from "next/headers"
 import { auth } from "@/lib/auth"
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 // import { AppSidebar } from "@/components/app-sidebar"
 import { DashboardSidebar } from "../components/DashboardSidebar";
 
@@ -18,13 +18,13 @@ const DashboardLayout = async ({
     const role = session?.user?.role || "seeker"
 
     return (
-        <SidebarProvider>
+        <SidebarProvider className="bg-[#131314]">
             <DashboardSidebar role={role} />
 
-            <main>
+            <SidebarInset className="bg-[#131314] min-h-svh">
                 <SidebarTrigger />
                 {children}
-            </main>
+            </SidebarInset>
         </SidebarProvider>
     )
 }

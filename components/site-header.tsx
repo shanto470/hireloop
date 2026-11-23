@@ -15,12 +15,9 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { useSession, signOut } from "@/lib/auth-client"
 
-const navLinks = [
-  { label: "Browse Jobs", href: "/jobs" },
-  { label: "Company", href: "/companies" },
-  { label: "Pricing", href: "/pricing" },
-]
+
 
 const signInClasses = cn(
   buttonVariants(),
@@ -48,6 +45,18 @@ function Logo() {
 }
 
 export function SiteHeader() {
+  const { data: session } = useSession()
+  // console.log("user session in navbar", session);
+  const navLinks = [
+    { label: "Browse Jobs", href: "/jobs" },
+    { label: "Company", href: "/companies" },
+    { label: "Pricing", href: "/pricing" },
+    { label: "Dashboard", href: `/dashboard/${session?.user?.role || 'seeker'}` },
+  ]
+
+  const handleSignOut = async () => {
+    await signOut();
+  }
   return (
     <header className="sticky top-0 z-40 px-4 pt-4 sm:px-6 sm:pt-6">
       <div className="mx-auto flex h-[74px] w-full max-w-[1320px] items-center justify-between rounded-2xl bg-[#222222] pr-2 pl-6">
@@ -70,14 +79,28 @@ export function SiteHeader() {
             </ul>
           </nav>
           <span aria-hidden="true" className="mx-6 w-px h-6  bg-[#a8a8a8]/40" />
-          <div className="flex items-center gap-4">
-            <Link href="/sign-in" className={signInClasses}>
-              Sign In
-            </Link>
-            <Link href="/sign-up" className={getStartedClasses}>
-              Get Started
-            </Link>
-          </div>
+          {
+            session?.user ?
+              <>
+                <h3>
+                  Welcome,<span className=" font-extrabold mx-1"> {session.user.name}
+                  </span>
+                </h3>
+                <Link onClick={handleSignOut} href="/" className={signInClasses} >
+                  Sign Out
+                </Link>
+              </> :
+              <>
+                <div className="flex items-center gap-4">
+                  <Link href="/sign-in" className={signInClasses}>
+                    Sign In
+                  </Link>
+                  <Link href="/sign-up" className={getStartedClasses}>
+                    Get Started
+                  </Link>
+                </div>
+              </>
+          }
         </div>
 
         {/* Mobile */}
@@ -118,22 +141,38 @@ export function SiteHeader() {
                 </ul>
               </nav>
               <div aria-hidden="true" className="mx-4 h-px bg-[#a8a8a8]/40" />
-              <div className="flex flex-col gap-2 p-4">
-                <SheetClose
-                  render={<Link href="/sign-in" />}
-                  nativeButton={false}
-                  className={cn(signInClasses, "h-12 w-full")}
-                >
-                  Sign In
-                </SheetClose>
-                <SheetClose
-                  render={<Link href="/sign-up" />}
-                  nativeButton={false}
-                  className={cn(getStartedClasses, "h-12 w-full")}
-                >
-                  Get Started
-                </SheetClose>
-              </div>
+
+
+              {
+                session?.user ?
+                  <>
+                    <h3 className="ml-6">
+                      Welcome,<span className=" font-extrabold text-xl mx-1" > {session.user.name}
+                      </span>
+                    </h3>
+                    <Link onClick={handleSignOut} href="/" className={signInClasses} >
+                      Sign Out
+                    </Link>
+                  </>
+                  : <>
+                    <div className="flex flex-col gap-2 p-4">
+                      <SheetClose
+                        render={<Link href="/sign-in" />}
+                        nativeButton={false}
+                        className={cn(signInClasses, "h-12 w-full")}
+                      >
+                        Sign In
+                      </SheetClose>
+                      <SheetClose
+                        render={<Link href="/sign-up" />}
+                        nativeButton={false}
+                        className={cn(getStartedClasses, "h-12 w-full")}
+                      >
+                        Get Started
+                      </SheetClose>
+                    </div>
+                  </>
+              }
             </SheetContent>
           </Sheet>
         </div>

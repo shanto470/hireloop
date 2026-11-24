@@ -1,11 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+// import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { toast } from "@/components/ui/toast"
 import {
     Select,
     SelectContent,
@@ -25,6 +26,9 @@ import {
     SendIcon,
 } from "lucide-react"
 import { createJob } from "@/lib/actions/jobs"
+// import { router } from "better-auth/api"
+import { useRouter } from 'next/navigation'
+
 
 /* ------------------------------------------------------------------ */
 /* Shared field styles — from the Figma "Add New Job" frame            */
@@ -64,7 +68,8 @@ const qualificationsPlaceholder =
 /* ------------------------------------------------------------------ */
 
 export default function NewJobPage() {
-    const [status, setStatus] = useState<string | null>(null)
+    // const [status, setStatus] = useState<string | null>(null)
+    const router = useRouter()
     async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
 
@@ -75,12 +80,19 @@ export default function NewJobPage() {
 
             const result = await createJob(jobData);
 
-            console.log(result);
-            setStatus("Job created successfully!");
+            // console.log(result);
+            // setStatus("Job created successfully!");
+            if (result.insertedId) {
+                toast.add({
+                    title: `Job created successfully!`,
+                    description: "The job has created",
+                })
+                router.push('/dashboard/recruiter/jobs')
+            }
 
         } catch (error) {
             console.error(error);
-            setStatus("Failed to create job.");
+            // setStatus("Failed to create job.");
         }
     }
 

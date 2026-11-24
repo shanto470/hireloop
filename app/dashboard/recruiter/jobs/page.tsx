@@ -1,25 +1,24 @@
-"use client"
-
 import Link from "next/link"
-import { useEffect, useRef, useState } from "react"
 import {
   BriefcaseBusiness,
   ChevronRight,
   CirclePlus,
-  EllipsisVertical,
   Globe,
   MapPin,
   Pencil,
-  Trash2,
   Users,
 } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { getJobs } from "@/lib/api/jobs"
+import { DeleteJobDialog } from "@/app/components/DeleteJobDialog"
 
 type JobStatus = "Active" | "Expired"
-type JobType = "Full-time" | "Part-time"
+type JobType = "Full-time" | "Part-time" | "Internship" | "Contract"
 
-type Job = {
+export type Job = {
+  _id: string
   id: string
   title: string
   department: string
@@ -33,82 +32,76 @@ type Job = {
   deadline: string
 }
 
-type Toast = {
-  id: number
-  message: string
-  tone: "success" | "error"
+type ApiJob = Record<string, unknown>
+
+function asString(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback
 }
 
-const INITIAL_JOBS: Job[] = [
-  {
-    id: "job-1",
-    title: "Frontend Developer",
-    department: "Engineering",
-    company: "HirePulse Network",
-    location: "Remote (New York, USA)",
-    locationType: "Remote",
-    type: "Full-time",
-    compensation: "€25 – €40 / hr",
-    applicants: 34,
-    status: "Active",
-    deadline: "May 30, 2025",
-  },
-  {
-    id: "job-2",
-    title: "Senior Product Designer",
-    department: "Design",
-    company: "HirePulse Labs",
-    location: "London, UK (Hybrid)",
-    locationType: "Hybrid",
-    type: "Full-time",
-    compensation: "€90k – €115k / yr",
-    applicants: 19,
-    status: "Active",
-    deadline: "Jun 14, 2025",
-  },
-  {
-    id: "job-3",
-    title: "DevOps Specialist",
-    department: "Infrastructure",
-    company: "HirePulse Platform",
-    location: "Berlin, Germany",
-    locationType: "On-site",
-    type: "Full-time",
-    compensation: "€95k – €120k / yr",
-    applicants: 12,
-    status: "Active",
-    deadline: "Jun 30, 2025",
-  },
-  {
-    id: "job-4",
-    title: "Product Marketing Lead",
-    department: "Marketing",
-    company: "HirePulse Network",
-    location: "Remote (EU/US)",
-    locationType: "Remote",
-    type: "Full-time",
-    compensation: "€80k – €105k / yr",
-    applicants: 27,
-    status: "Active",
-    deadline: "Jul 15, 2025",
-  },
-  {
-    id: "job-5",
-    title: "QA Automation Engineer",
-    department: "Quality",
-    company: "HirePulse Platform",
-    location: "Dublin, Ireland (Hybrid)",
-    locationType: "Hybrid",
-    type: "Part-time",
-    compensation: "€35 – €50 / hr",
-    applicants: 8,
-    status: "Expired",
-    deadline: "May 01, 2025",
-  },
-]
+function asNumber(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return fallback
+}
+
+function normalizeJob(job: ApiJob, index: number): Job {
+  const id = asString(job._id) || asString(job.id) || `job-${index}`
+  const minSalary = asString(job.minSalary)
+  const maxSalary = asString(job.maxSalary)
+  const frequency = asString(job.frequency)
+  const compensation =
+    asString(job.compensation) ||
+    (minSalary && maxSalary
+      ? `${minSalary} – ${maxSalary}${frequency ? ` / ${frequency.replace(/^per\s+/, "")}` : ""}`
+      : minSalary || maxSalary || "Not specified")
+
+  const rawStatus = asString(job.status)
+  const deadline = asString(job.deadline, "No deadline")
+  const deadlineDate = new Date(deadline)
+  const isExpired =
+    rawStatus.toLowerCase() === "expired" ||
+    (!Number.isNaN(deadlineDate.getTime()) && deadlineDate < new Date())
+
+  const remoteValue = job.isRemote
+  const isRemote =
+    remoteValue === true ||
+    (typeof remoteValue === "string" && remoteValue.toLowerCase() === "true")
+
+  const location = asString(job.location, "Location not specified")
+  const locationType: Job["locationType"] = isRemote
+    ? "Remote"
+    : location.toLowerCase().includes("hybrid")
+      ? "Hybrid"
+      : "On-site"
+
+  const rawType = asString(job.jobType) || asString(job.type)
+  const allowedTypes: JobType[] = ["Full-time", "Part-time", "Internship", "Contract"]
+  const type: JobType = allowedTypes.includes(rawType as JobType)
+    ? (rawType as JobType)
+    : "Full-time"
+
+  return {
+    _id: id,
+    id,
+    title: asString(job.jobTitle) || asString(job.title, "Untitled job"),
+    department: asString(job.jobCategory) || asString(job.department, "General"),
+    company: asString(job.companyName) || asString(job.company, "Unknown company"),
+    location,
+    locationType,
+    type,
+    compensation,
+    applicants: asNumber(job.applicants),
+    status: isExpired ? "Expired" : "Active",
+    deadline,
+  }
+}
 
 function StatusBadge({ status }: { status: JobStatus }) {
   const active = status === "Active"
+
   return (
     <span
       className={cn(
@@ -137,82 +130,11 @@ function TypeBadge({ type }: { type: JobType }) {
   )
 }
 
-function LoadingRows() {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, index) => (
-        <tr key={index} className="border-b border-[#232327] last:border-b-0">
-          {Array.from({ length: 8 }).map((__, cellIndex) => (
-            <td key={cellIndex} className="px-4 py-4">
-              <div className="h-4 w-full max-w-[140px] animate-pulse rounded bg-[#232327]" />
-            </td>
-          ))}
-        </tr>
-      ))}
-    </>
+export default async function ManageJobsPage() {
+  const data = await getJobs()
+  const jobs: Job[] = (Array.isArray(data) ? data : []).map((job, index) =>
+    normalizeJob(job as ApiJob, index)
   )
-}
-
-export default function ManageJobsPage() {
-  const [jobs, setJobs] = useState<Job[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [jobToDelete, setJobToDelete] = useState<Job | null>(null)
-  const [openMenuJobId, setOpenMenuJobId] = useState<string | null>(null)
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const menuRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setJobs(INITIAL_JOBS)
-      setIsLoading(false)
-    }, 450)
-
-    return () => window.clearTimeout(timer)
-  }, [])
-
-  useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      if (!menuRef.current?.contains(event.target as Node)) {
-        setOpenMenuJobId(null)
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown)
-    return () => document.removeEventListener("mousedown", handlePointerDown)
-  }, [])
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpenMenuJobId(null)
-        setJobToDelete(null)
-      }
-    }
-
-    document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [])
-
-  function pushToast(message: string, tone: Toast["tone"]) {
-    const id = Date.now() + Math.floor(Math.random() * 1000)
-    setToasts((current) => [...current, { id, message, tone }])
-    window.setTimeout(() => {
-      setToasts((current) => current.filter((toast) => toast.id !== id))
-    }, 2800)
-  }
-
-  function handleDelete() {
-    if (!jobToDelete) return
-
-    try {
-      setJobs((current) => current.filter((job) => job.id !== jobToDelete.id))
-      pushToast(`"${jobToDelete.title}" was deleted.`, "success")
-      setJobToDelete(null)
-      setOpenMenuJobId(null)
-    } catch {
-      pushToast("Failed to delete job post.", "error")
-    }
-  }
 
   return (
     <div className="min-h-svh bg-[#131314] px-4 py-6 text-white sm:px-6 lg:px-8">
@@ -275,9 +197,7 @@ export default function ManageJobsPage() {
               </thead>
 
               <tbody>
-                {isLoading ? (
-                  <LoadingRows />
-                ) : jobs.length === 0 ? (
+                {jobs.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-6 py-16 text-center">
                       <div className="mx-auto flex max-w-md flex-col items-center gap-3">
@@ -308,7 +228,7 @@ export default function ManageJobsPage() {
 
                     return (
                       <tr
-                        key={job.id}
+                        key={job._id}
                         className="border-b border-[#232327] transition-colors hover:bg-[#19191c] last:border-b-0"
                       >
                         <td className="px-4 py-4 align-top">
@@ -356,7 +276,10 @@ export default function ManageJobsPage() {
                             href={`/dashboard/recruiter/applications?jobId=${job.id}`}
                             className="inline-flex items-center gap-1.5 text-sm text-[#d4d4d8] transition-colors hover:text-white"
                           >
-                            <Users className="size-4 text-[#8e8e96]" aria-hidden="true" />
+                            <Users
+                              className="size-4 text-[#8e8e96]"
+                              aria-hidden="true"
+                            />
                             <span>{job.applicants} Candidates</span>
                           </Link>
                         </td>
@@ -366,91 +289,35 @@ export default function ManageJobsPage() {
                         </td>
 
                         <td className="px-4 py-4 align-top">
-                          <p className="text-sm text-[#e4e4e7]">{job.deadline}</p>
-                          <p className="mt-1 text-xs text-[#71717a]">Deadline</p>
+                          <p className="text-sm text-[#e4e4e7]">
+                            {job.deadline}
+                          </p>
+                          <p className="mt-1 text-xs text-[#71717a]">
+                            Deadline
+                          </p>
                         </td>
 
                         <td className="px-4 py-4 align-top">
-                          <div className="flex items-center gap-2">
-                            <Button
-                              nativeButton={false}
-                              render={
-                                <Link href={`/dashboard/recruiter/jobs/${job.id}/edit`} />
-                              }
-                              variant="outline"
-                              className="h-9 gap-1.5 rounded-lg border-[#34343a] bg-transparent px-3 text-xs font-medium text-[#f4f4f5] hover:bg-[#232327] hover:text-white"
-                            >
-                              <Pencil className="size-3.5" aria-hidden="true" />
-                              Update
-                            </Button>
+                          <Button
+                            nativeButton={false}
+                            render={
+                              <Link
+                                href={`/dashboard/recruiter/jobs/${job.id}/edit`}
+                              />
+                            }
+                            variant="outline"
+                            className="h-9 gap-1.5 rounded-lg border-[#34343a] bg-transparent px-3 text-xs font-medium text-[#f4f4f5] hover:bg-[#232327] hover:text-white"
+                          >
+                            <Pencil
+                              className="size-3.5"
+                              aria-hidden="true"
+                            />
+                            Update
+                          </Button>
+                        </td>
+                        <td>
+                          <DeleteJobDialog job={job}></DeleteJobDialog>
 
-                            <button
-                              type="button"
-                              aria-label={`Delete ${job.title}`}
-                              onClick={() => setJobToDelete(job)}
-                              className="inline-flex size-9 items-center justify-center rounded-lg border border-[#34343a] text-[#a0a0ab] transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400"
-                            >
-                              <Trash2 className="size-4" aria-hidden="true" />
-                            </button>
-
-                            <div
-                              className="relative"
-                              ref={openMenuJobId === job.id ? menuRef : null}
-                            >
-                              <button
-                                type="button"
-                                aria-label={`More options for ${job.title}`}
-                                aria-haspopup="menu"
-                                aria-expanded={openMenuJobId === job.id}
-                                onClick={() =>
-                                  setOpenMenuJobId((current) =>
-                                    current === job.id ? null : job.id
-                                  )
-                                }
-                                className="inline-flex size-9 items-center justify-center rounded-lg border border-[#34343a] text-[#a0a0ab] transition-colors hover:bg-[#232327] hover:text-white"
-                              >
-                                <EllipsisVertical
-                                  className="size-4"
-                                  aria-hidden="true"
-                                />
-                              </button>
-
-                              {openMenuJobId === job.id && (
-                                <div
-                                  role="menu"
-                                  className="absolute right-0 z-20 mt-2 w-44 rounded-xl border border-[#2f2f33] bg-[#1b1b1e] p-1 shadow-xl"
-                                >
-                                  <Link
-                                    role="menuitem"
-                                    href={`/dashboard/recruiter/jobs/${job.id}`}
-                                    className="block rounded-lg px-3 py-2 text-sm text-[#e4e4e7] hover:bg-[#232327]"
-                                    onClick={() => setOpenMenuJobId(null)}
-                                  >
-                                    View details
-                                  </Link>
-                                  <Link
-                                    role="menuitem"
-                                    href={`/dashboard/recruiter/applications?jobId=${job.id}`}
-                                    className="block rounded-lg px-3 py-2 text-sm text-[#e4e4e7] hover:bg-[#232327]"
-                                    onClick={() => setOpenMenuJobId(null)}
-                                  >
-                                    View applicants
-                                  </Link>
-                                  <button
-                                    type="button"
-                                    role="menuitem"
-                                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10"
-                                    onClick={() => {
-                                      setOpenMenuJobId(null)
-                                      setJobToDelete(job)
-                                    }}
-                                  >
-                                    Delete job
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
                         </td>
                       </tr>
                     )
@@ -460,63 +327,6 @@ export default function ManageJobsPage() {
             </table>
           </div>
         </section>
-      </div>
-
-      {jobToDelete && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-job-title"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setJobToDelete(null)
-          }}
-        >
-          <div className="w-full max-w-md rounded-2xl border border-[#2f2f33] bg-[#18181b] p-6 shadow-2xl">
-            <h2 id="delete-job-title" className="text-lg font-semibold text-white">
-              Delete job post?
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-[#a0a0ab]">
-              Are you sure you want to delete{" "}
-              <span className="font-medium text-white">{jobToDelete.title}</span>?
-              This action cannot be undone.
-            </p>
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 rounded-xl border-[#34343a] bg-transparent text-[#f4f4f5] hover:bg-[#232327] hover:text-white"
-                onClick={() => setJobToDelete(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="h-10 rounded-xl bg-red-500 text-white hover:bg-red-400"
-                onClick={handleDelete}
-              >
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="pointer-events-none fixed right-4 bottom-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            role="status"
-            className={cn(
-              "pointer-events-auto rounded-xl border px-4 py-3 text-sm shadow-lg backdrop-blur",
-              toast.tone === "success"
-                ? "border-emerald-500/30 bg-[#13201a]/95 text-emerald-200"
-                : "border-red-500/30 bg-[#241516]/95 text-red-200"
-            )}
-          >
-            {toast.message}
-          </div>
-        ))}
       </div>
     </div>
   )

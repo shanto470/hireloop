@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 // import { AppSidebar } from "@/components/app-sidebar"
 import { DashboardSidebar } from "../components/DashboardSidebar";
+import { Toaster } from "@/components/ui/toast"
 
 
 const DashboardLayout = async ({
@@ -25,6 +26,7 @@ const DashboardLayout = async ({
                 <SidebarTrigger />
                 {children}
             </SidebarInset>
+            <Toaster />
         </SidebarProvider>
     )
 }
